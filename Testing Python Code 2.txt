@@ -1,0 +1,65 @@
+import pandas as pd
+import os
+
+original_folder = 'path/to/original_folder'
+table_folder = 'path/to/table_folder'
+
+matched = []
+original_unmatched = []
+table_unmatched = []
+
+for original_file in os.listdir(original_folder):
+    if not original_file.endswith('.xlsx'):
+        continue
+
+    original_path = os.path.join(original_folder, original_file)
+    original_df = pd.read_excel(original_path)
+
+    for orig_idx, original_row in original_df.iterrows():
+        for table_file in os.listdir(table_folder):
+            if not table_file.endswith('.xlsx'):
+                continue
+
+            table_path = os.path.join(table_folder, table_file)
+            table_df = pd.read_excel(table_path)
+
+            used_table_cells = set()
+
+            for orig_col, orig_val in original_row.items():
+                if pd.isna(orig_val):
+                    continue
+
+                found_match = False
+                for i, row in table_df.iterrows():
+                    for table_col, table_val in row.items():
+                        if pd.isna(table_val):
+                            continue
+                        if str(orig_val).strip() == str(table_val).strip():
+                            matched.append((original_file, orig_idx, orig_col, orig_val, table_file, i, table_col))
+                            used_table_cells.add((table_file, i, table_col))
+                            found_match = True
+                            break
+                    if found_match:
+                        break
+
+                if not found_match:
+                    original_unmatched.append((original_file, orig_idx, orig_col, orig_val))
+
+            for i, row in table_df.iterrows():
+                for table_col, table_val in row.items():
+                    if pd.isna(table_val):
+                        continue
+                    if (table_file, i, table_col) not in used_table_cells:
+                        table_unmatched.append((table_file, i, table_col, table_val))
+
+print("\n--- Matched Values ---")
+for orig_file, orig_idx, orig_col, orig_val, table_file, row_idx, table_col in matched:
+    print(f"[{orig_file}] Row {orig_idx} [{orig_col}] = {orig_val} --> [{table_file}] Row {row_idx}, Column {table_col}")
+
+print("\n--- Unmatched Values in Original Files ---")
+for orig_file, orig_idx, col, val in original_unmatched:
+    print(f"[{orig_file}] Row {orig_idx}, Column: {col}, Value: {val}")
+
+print("\n--- Unmatched Values in Table Files ---")
+for file, idx, col, val in table_unmatched:
+    print(f"[{file}] Row: {idx}, Column: {col}, Value: {val}")
