@@ -1,0 +1,87 @@
+import pandas as pd
+import os
+
+original_folder = 'path/to/original_folder'
+table_folder = 'path/to/table_folder'
+
+matched_records = []
+original_unmatched_records = []
+table_unmatched_records = []
+
+for original_file in os.listdir(original_folder):
+    if not original_file.endswith('.xlsx'):
+        continue
+
+    original_path = os.path.join(original_folder, original_file)
+    original_df = pd.read_excel(original_path)
+
+    for orig_idx, original_row in original_df.iterrows():
+        for table_file in os.listdir(table_folder):
+            if not table_file.endswith('.xlsx'):
+                continue
+
+            table_path = os.path.join(table_folder, table_file)
+            table_df = pd.read_excel(table_path)
+
+            used_table_cells = set()
+
+            for orig_col, orig_val in original_row.items():
+                if pd.isna(orig_val):
+                    continue
+
+                found_match = False
+                for tbl_idx, table_row in table_df.iterrows():
+                    for table_col, table_val in table_row.items():
+                        if pd.isna(table_val):
+                            continue
+                        if str(orig_val).strip() == str(table_val).strip():
+                            matched_records.append({
+                                'Original File': original_file,
+                                'Original Row Index': orig_idx,
+                                'Original Column': orig_col,
+                                'Original Value': orig_val,
+                                'Table File': table_file,
+                                'Table Row Index': tbl_idx,
+                                'Table Column': table_col,
+                                'Matched Value': table_val
+                            })
+                            used_table_cells.add((table_file, tbl_idx, table_col))
+                            found_match = True
+                            break
+                    if found_match:
+                        break
+
+                if not found_match:
+                    original_unmatched_records.append({
+                        'Original File': original_file,
+                        'Original Row Index': orig_idx,
+                        'Original Column': orig_col,
+                        'Original Value': orig_val
+                    })
+
+            for tbl_idx, table_row in table_df.iterrows():
+                for table_col, table_val in table_row.items():
+                    if pd.isna(table_val):
+                        continue
+                    if (table_file, tbl_idx, table_col) not in used_table_cells:
+                        table_unmatched_records.append({
+                            'Table File': table_file,
+                            'Table Row Index': tbl_idx,
+                            'Table Column': table_col,
+                            'Table Value': table_val
+                        })
+
+# Convert to DataFrames
+matched_df = pd.DataFrame(matched_records)
+original_unmatched_df = pd.DataFrame(original_unmatched_records)
+table_unmatched_df = pd.DataFrame(table_unmatched_records)
+
+# Print summary
+print("\n--- Matched Values ---")
+print(matched_df)
+
+print("\n--- Unmatched Values in Original Files ---")
+print(original_unmatched_df)
+
+print("\n--- Unmatched Values in Table Files ---")
+print(table_unmatched_df)
